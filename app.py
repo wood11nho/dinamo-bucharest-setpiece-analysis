@@ -232,11 +232,11 @@ def calculate_set_piece_zones_effectiveness(df: pd.DataFrame) -> Dict:
             return 'Middle Third'
         else:
             if y <= 33:
-                return 'Attacking Third - Right'
+                return 'Attacking Third - Left'
             elif y <= 66:
                 return 'Attacking Third - Center'
             else:
-                return 'Attacking Third - Left'
+                return 'Attacking Third - Right'
     
     dinamo_sp['zone'] = dinamo_sp.apply(lambda row: get_zone(row['location.x'], row['location.y']), axis=1)
     
@@ -417,9 +417,11 @@ def build_set_piece_catalog(df: pd.DataFrame) -> pd.DataFrame:
         if on_target.loc[shot_rows.index].fillna(False).any():
             return "Shot on target"
         return "Shot off target"
-
+    
+    # Add match context columns that exist in the CSV ('date', 'label')
     catalog = initiators[[
-        "possession.id", "team.name", "type.primary", "player.name", "_minute", "_second"
+        "possession.id", "team.name", "type.primary", "player.name", "_minute", "_second",
+        "date", "label"
     ]].rename(columns={
         "team.name": "team",
         "type.primary": "set_piece_type",
@@ -461,9 +463,9 @@ def build_dna_figure(events: pd.DataFrame, highlight_team: Optional[str] = None,
 
     # Prepare numeric coordinates
     sx = pd.to_numeric(events.get("location.x", pd.Series(index=events.index, dtype=float)), errors="coerce")
-    sy = pd.to_numeric(events.get("location.y", pd.Series(index=events.index, dtype=float)), errors="coerce")
+    sy = 100 - pd.to_numeric(events.get("location.y", pd.Series(index=events.index, dtype=float)), errors="coerce")
     ex = pd.to_numeric(events.get("pass.endLocation.x", pd.Series(index=events.index, dtype=float)), errors="coerce")
-    ey = pd.to_numeric(events.get("pass.endLocation.y", pd.Series(index=events.index, dtype=float)), errors="coerce")
+    ey = 100 - pd.to_numeric(events.get("pass.endLocation.y", pd.Series(index=events.index, dtype=float)), errors="coerce")
 
     # Precompute shot outcome color per row
     is_goal = events.get("shot.isGoal", pd.Series(index=events.index, dtype=bool)).fillna(False)
@@ -712,8 +714,8 @@ def analyze_delivery_zones(dinamo_attacking):
     fig_corners = create_custom_pitch()
     if not corners.empty:
         fig_corners.update_layout(title=dict(text="<b>Corner Kick Analysis: Delivery Zones & Danger (xG)</b>", x=0.5, font=dict(size=20, color='white')))
-        fig_corners.add_trace(go.Histogram2dContour(x=corners['pass.endLocation.x'], y=corners['pass.endLocation.y'], colorscale='Reds', showscale=False, name='Delivery Frequency', contours=dict(coloring='heatmap'), opacity=0.5))
-        fig_corners.add_trace(go.Scatter(x=corners['pass.endLocation.x'], y=corners['pass.endLocation.y'], mode='markers', marker=dict(color=corners['possession.attack.xg'], colorscale='YlOrRd', size=corners['possession.attack.xg'] * 70 + 10, sizemode='diameter', showscale=True, colorbar=dict(title='xG'), opacity=0.8), name='Delivery Danger (xG)', hoverinfo='text', text=[f"xG: {xg:.3f}" for xg in corners['possession.attack.xg']]))
+        fig_corners.add_trace(go.Histogram2dContour(x=corners['pass.endLocation.x'], y=100-corners['pass.endLocation.y'], colorscale='Reds', showscale=False, name='Delivery Frequency', contours=dict(coloring='heatmap'), opacity=0.5))
+        fig_corners.add_trace(go.Scatter(x=corners['pass.endLocation.x'], y=100-corners['pass.endLocation.y'], mode='markers', marker=dict(color=corners['possession.attack.xg'], colorscale='YlOrRd', size=corners['possession.attack.xg'] * 70 + 10, sizemode='diameter', showscale=True, colorbar=dict(title='xG'), opacity=0.8), name='Delivery Danger (xG)', hoverinfo='text', text=[f"xG: {xg:.3f}" for xg in corners['possession.attack.xg']]))
 
     # Free Kicks
     attacking_fks = dinamo_attacking[(dinamo_attacking['type.primary'] == 'free_kick') & (dinamo_attacking['location.x'] > 50)].copy()
@@ -723,9 +725,9 @@ def analyze_delivery_zones(dinamo_attacking):
     fig_fks = create_custom_pitch()
     if not attacking_fks.empty:
         fig_fks.update_layout(title=dict(text="<b>Attacking Free Kick Analysis: Delivery Zones & Danger (xG)</b>", x=0.5, font=dict(size=20, color='white')))
-        fig_fks.add_trace(go.Histogram2dContour(x=attacking_fks['pass.endLocation.x'], y=attacking_fks['pass.endLocation.y'], colorscale='Blues', showscale=False, name='Delivery Frequency', contours=dict(coloring='heatmap'), opacity=0.5))
-        fig_fks.add_trace(go.Scatter(x=attacking_fks['pass.endLocation.x'], y=attacking_fks['pass.endLocation.y'], mode='markers', marker=dict(color=attacking_fks['possession.attack.xg'], colorscale='Cividis', size=attacking_fks['possession.attack.xg'] * 70 + 10, sizemode='diameter', showscale=True, colorbar=dict(title='xG'), opacity=0.8), name='Delivery Danger (xG)', hoverinfo='text', text=[f"xG: {xg:.3f}" for xg in attacking_fks['possession.attack.xg']]))
-        fig_fks.add_trace(go.Scatter(x=attacking_fks['location.x'], y=attacking_fks['location.y'], mode='markers', marker=dict(color='cyan', size=8, symbol='x'), name='Free Kick Location'))
+        fig_fks.add_trace(go.Histogram2dContour(x=attacking_fks['pass.endLocation.x'], y=100-attacking_fks['pass.endLocation.y'], colorscale='Blues', showscale=False, name='Delivery Frequency', contours=dict(coloring='heatmap'), opacity=0.5))
+        fig_fks.add_trace(go.Scatter(x=attacking_fks['pass.endLocation.x'], y=100-attacking_fks['pass.endLocation.y'], mode='markers', marker=dict(color=attacking_fks['possession.attack.xg'], colorscale='Cividis', size=attacking_fks['possession.attack.xg'] * 70 + 10, sizemode='diameter', showscale=True, colorbar=dict(title='xG'), opacity=0.8), name='Delivery Danger (xG)', hoverinfo='text', text=[f"xG: {xg:.3f}" for xg in attacking_fks['possession.attack.xg']]))
+        fig_fks.add_trace(go.Scatter(x=attacking_fks['location.x'], y=100-attacking_fks['location.y'], mode='markers', marker=dict(color='cyan', size=8, symbol='x'), name='Free Kick Location'))
 
     return fig_corners, fig_fks
 
@@ -801,7 +803,7 @@ def analyze_defensive_vulnerabilities(dinamo_defending, df):
         if pd.notna(possession_id):
             possession_shots = df[(df['possession.id'] == possession_id) & (df['type.primary'] == 'shot') & (df['team.name'] != 'Dinamo Bucureşti')]
             for _, shot in possession_shots.iterrows():
-                set_piece_shots_conceded.append({'x': shot['location.x'], 'y': shot['location.y'], 'is_goal': shot['shot.isGoal'], 'xg': shot['shot.xg'] if pd.notna(shot['shot.xg']) else 0})
+                set_piece_shots_conceded.append({'x': shot['location.x'], 'y': 100-shot['location.y'], 'is_goal': shot['shot.isGoal'], 'xg': shot['shot.xg'] if pd.notna(shot['shot.xg']) else 0})
     
     fig = create_custom_pitch()
     fig.update_layout(title=dict(text="<b>Dinamo București - Defensive Vulnerabilities from Set-Pieces</b>", x=0.5, font=dict(size=20, color='white')))
@@ -1322,10 +1324,10 @@ def page_set_piece_dna(df: pd.DataFrame) -> None:
             st.info("No sequences match the selected filters.")
             return
 
-        # Selection list
-        filtered = filtered.sort_values(["minute", "second"]).reset_index(drop=True)
+        # Selection list using the correct 'label' column
+        filtered = filtered.sort_values(["date", "minute", "second"]).reset_index(drop=True)
         options = [
-            f"PID {row['possession.id']} — {row['team']} — {row['taker']} — {int(row['minute']):02d}:{int(row['second']):02d} — {row['outcome']}"
+            f"{row['label'].split(',')[0]} | {int(row['minute']):02d}' | Taker: {row['taker']} → {row['outcome']}"
             for _, row in filtered.iterrows()
         ]
         sel_label = st.selectbox("Select a set-piece sequence", options=options)
@@ -1339,9 +1341,34 @@ def page_set_piece_dna(df: pd.DataFrame) -> None:
         if ev.empty:
             st.info("No events available for the selected possession.")
             return
-        # Show brief meta
+
+        # Show detailed meta information parsed from the 'label' and 'date' columns
         head = filtered.loc[sel_idx]
-        st.markdown(f"**Team:** {head['team']} &nbsp;&nbsp; **Taker:** {head['taker']} &nbsp;&nbsp; **Outcome:** {head['outcome']}")
+        
+        # Parse match information from the 'label' column
+        try:
+            match_info, final_score = head['label'].split(',')
+            home_team, away_team = match_info.split(' - ')
+        except ValueError:
+            # Fallback if the label format is unexpected
+            home_team, away_team, final_score = "Unknown Match", "", ""
+
+        match_date = datetime.strptime(head['date'], '%Y-%m-%d %H:%M:%S').strftime('%d %B %Y')
+
+        st.markdown(f"#### Match: {home_team.strip()} vs. {away_team.strip()}")
+        st.markdown(f"**Date:** {match_date}  \n**Final Score:** {final_score.strip()}")
+        st.markdown("---")
+        
+        event_time = f"{int(head['minute']):02d}:{int(head['second']):02d}"
+        st.markdown(f"**Event Time:** {event_time}  \n**Set-Piece Taker:** {head['taker']} ({head['team']})  \n**Possession Outcome:** {head['outcome']}")
+
+        # If it was a goal, find and display the scorer
+        if head['outcome'] == 'Goal':
+            goal_event = ev[(ev['shot.isGoal'] == True) & (ev['team.name'] == head['team'])]
+            if not goal_event.empty:
+                scorer = goal_event.iloc[0]['player.name']
+                st.success(f"⚽ **Goal Scorer:** {scorer}")
+
         fig = build_dna_figure(ev, highlight_team=str(head["team"]), animated=animated)
         st.plotly_chart(fig, use_container_width=True)
 
@@ -1664,7 +1691,7 @@ def page_offensive_analysis(df):
                 # Add heat map overlay
                 fig.add_trace(go.Histogram2d(
                     x=sp_locations['location.x'],
-                    y=sp_locations['location.y'],
+                    y=100-sp_locations['location.y'],
                     colorscale='Reds',
                     showscale=True,
                     opacity=0.7,
@@ -1842,7 +1869,7 @@ def page_defensive_analysis(df):
                 for _, shot in possession_shots.iterrows():
                     shots_conceded_data.append({
                         'x': shot['location.x'], 
-                        'y': shot['location.y'],
+                        'y': 100-shot['location.y'],
                         'is_goal': shot['shot.isGoal'],
                         'minute': shot['minute'],
                         'set_piece_type': set_piece['type.primary']
